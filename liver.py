@@ -33,7 +33,8 @@ for t in range(steps):
                 liver[i, j+1] + liver[i, j-1] - 4*liver[i, j]
             )
     # Kilo etkili dozaj girişi
-    new_liver[entry_x, entry_y] += dosage_amount = 2.0 * dosage_impact
+    dosage_amount = 2.0 * dosage_impact
+    new_liver[entry_x, entry_y] += dosage_amount
     liver = new_liver
 
 # 4. Görselleştirme
