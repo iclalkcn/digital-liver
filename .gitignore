@@ -361,3 +361,11 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# Veri Setleri
+karaciger_veri_seti_mini/
+*.csv
+*.dcm
+
+# Çıktı Dosyaları
+*.html
+__pycache__/
