@@ -1,52 +1,62 @@
+import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score
+from sklearn.preprocessing import LabelEncoder
 
-# 1. Kullanıcıdan Veri Girişi (İnteraktif Bölüm)
+# 1. VERİ SETİNİ YÜKLEME VE DERİNLEMESİNE ÖĞRETME
+df = pd.read_csv('liver_cirrhosis.csv')
+
+# Eksik verileri daha akıllıca dolduralım (Medyan ve Mod kullanarak)
+cols_to_fix = ['Bilirubin', 'Cholesterol', 'Albumin', 'Copper', 'Alk_Phos', 'Platelets']
+for col in cols_to_fix:
+    df[col] = df[col].fillna(df[col].median())
+df['Stage'] = df['Stage'].fillna(df['Stage'].mode()[0])
+
+# ÖZELLİK MÜHENDİSLİĞİ: Daha fazla veriyi öğretiyoruz
+le = LabelEncoder()
+df['Sex'] = le.fit_transform(df['Sex'])
+df['Age_Years'] = (df['Age'] / 365).astype(int)
+
+# 2. MODELİ GÜÇLENDİRME (Daha fazla parametre)
+# Bakır (Copper) ve Trombosit (Platelets) karaciğer için çok kritiktir
+features = ['Age_Years', 'Sex', 'Bilirubin', 'Cholesterol', 'Albumin', 'Copper', 'Platelets']
+X = df[features]
+y = df['Stage']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.15, random_state=42)
+
+# Algoritma ayarlarını (Hyperparameters) optimize ediyoruz
+model = RandomForestClassifier(n_estimators=200, max_depth=12, random_state=42)
+model.fit(X_train, y_train)
+
+# 3. BAŞARI RAPORU
+accuracy = accuracy_score(y_test, y_pred := model.predict(X_test))
+print(f"Geliştirilmiş Model Başarı Oranı: %{accuracy*100:.2f}")
+
+# 4. KLİNİK YORUMLAYICI FONKSİYONU
+def evre_yorumu(evre):
+    yorumlar = {
+        1: "Evre 1: Karaciğerde hafif iltihaplanma var ancak doku hasarı yok. Erken teşhis! Yaşam tarzı değişikliği ile iyileşme oranı yüksektir.",
+        2: "Evre 2: Fibrozis (dokuda sertleşme) başlamış. İlaç dozajı dikkatle ayarlanmalı, karaciğeri yoran maddelerden kaçınılmalıdır.",
+        3: "Evre 3: İleri düzey sertleşme. Karaciğer fonksiyonları azalmış. Acil klinik takip ve kişiselleştirilmiş tedavi şarttır.",
+        4: "Evre 4 (Siroz): Ciddi doku hasarı. Komplikasyon riski yüksek. Dozajlar minimum seviyede tutulmalı, uzman doktor denetimi zorunludur."
+    }
+    return yorumlar.get(evre, "Bilinmeyen Evre")
+
+# 5. TAHMİN VE BİLGİLENDİRME
+print("\n--- Hasta Analiz ve Karar Destek Sistemi ---")
 try:
-    user_age = int(input("Hastanın Yaşı: "))
-    user_weight = float(input("Hastanın Kilosu (kg): "))
-except ValueError:
-    print("Geçersiz giriş! Varsayılan değerler kullanılıyor.")
-    user_age, user_weight = 30, 70
-
-# 2. Fizyolojik Katsayıların Hesaplanması
-# Yaşlandıkça difüzyon (temizleme hızı) azalır
-age_factor = max(0.05, 0.6 - (user_age / 140)) 
-
-# Kilo arttıkça dağılım alanı (simülasyon alanı) genişler ama yoğunluk azalabilir
-# Burada kilo, ilacın dokudaki ilk konsantrasyon etkisini değiştirecek
-dosage_impact = 100 / user_weight  # Kilo arttıkça dozajın birim alandaki etkisi azalır
-
-grid_size = 50
-liver = np.zeros((grid_size, grid_size))
-dt = 0.1
-steps = 200
-entry_x, entry_y = 25, 0
-
-# 3. Simülasyon Döngüsü
-for t in range(steps):
-    new_liver = liver.copy()
-    for i in range(1, grid_size-1):
-        for j in range(1, grid_size-1):
-            new_liver[i, j] += age_factor * dt * (
-                liver[i+1, j] + liver[i-1, j] + 
-                liver[i, j+1] + liver[i, j-1] - 4*liver[i, j]
-            )
-    # Kilo etkili dozaj girişi
-    dosage_amount = 2.0 * dosage_impact
-    new_liver[entry_x, entry_y] += dosage_amount
-    liver = new_liver
-
-# 4. Görselleştirme
-plt.figure(figsize=(10, 6))
-plt.imshow(liver, cmap='magma')
-plt.colorbar(label='İlaç Konsantrasyon Yoğunluğu')
-plt.title(f"Dijital İkiz Analizi | Yaş: {user_age} | Kilo: {user_weight} kg")
-plt.show()
-
-print(f"\n--- Klinik Karar Destek Analizi ---")
-print(f"Hesaplanan Dağılım Katsayısı: {age_factor:.3f}")
-if user_age > 65 and user_weight < 60:
-    print("KRİTİK UYARI: Düşük kilo ve ileri yaş kombinasyonu yüksek toksisite riski taşır!")
-elif user_weight > 100:
-    print("BİLGİ: Yüksek kilo nedeniyle ilaç dağılımı daha geniş bir alana yayılmaktadır.")
+    age = int(input("Yaş: "))
+    sex = 1 if input("Cinsiyet (E/K): ").upper() == 'E' else 0
+    bili = float(input("Bilirubin (Örn 1.4): "))
+    plat = float(input("Trombosit (Platelets - Örn 250): "))
+    
+    # Modelin görmediği diğer değerler için veri seti ortalamasını veriyoruz
+    tahmin = model.predict([[age, sex, bili, 260, 3.5, 64, plat]])
+    
+    print(f"\n[TAHMİN EDİLEN EVRE]: {int(tahmin[0])}")
+    print(f"[KLİNİK BİLGİ]: {evre_yorumu(int(tahmin[0]))}")
+except Exception as e:
+    print(f"Giriş hatası: {e}")
